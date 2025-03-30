@@ -1,21 +1,17 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { pool } = require('../db'); // Import query function from db.js
+const db = require("../db"); // Ensure this correctly initializes your database connection
+const Bill = require("../models/bill")(db);
 
 // Fetch all bills from the database
 router.get("/", async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM bills');
+    const bills = await Bill.getAll();
     
-    // If no bills found, send an empty array
-    if (result.rows.length === 0) {
-      return res.json({ bills: [], categories: [] });
-    }
+    // Fetch categories (assuming a Category model or direct query)
+    const categoriesResult = await db.query("SELECT * FROM categories");
 
-    // Query categories (assuming you have a categories table)
-    const categoriesResult = await pool.query('SELECT * FROM categories');
-    
-    res.json({ bills: result.rows, categories: categoriesResult.rows });
+    res.json({ bills, categories: categoriesResult.rows });
   } catch (error) {
     console.error("Error fetching bills:", error);
     res.status(500).send("Error fetching bills");
@@ -23,5 +19,4 @@ router.get("/", async (req, res) => {
 });
 
 module.exports = router;
-
 

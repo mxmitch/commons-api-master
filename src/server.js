@@ -14,7 +14,7 @@ const port = process.env.PORT || 5000;
 // Enable CORS for your frontend URL
 // Enable CORS for your frontend URL
 app.use(cors({
-  origin: 'http://localhost:3001',  // React app URL (adjust for your environment)
+  origin: 'http://localhost:3000',  // React app URL (adjust for your environment)
   methods: 'GET,POST,PUT,DELETE',  // Allow these HTTP methods
   allowedHeaders: 'Content-Type,Authorization',  // Allow these headers
   credentials: true  // Allow credentials (cookies)
