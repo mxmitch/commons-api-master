@@ -31,35 +31,6 @@ app.get("/", (req, res) => {
   res.send("Welcome to the Commons API!");
 });
 
-
-app.get("/api/auth/loginStatus", async (req, res) => {
-  try {
-    const userId = req.user.id; // assuming you're using JWT and the user ID is in the JWT token
-    
-    // Fetch the full user data from the database
-    const user = await User.findById(userId);
-
-    if (user) {
-      // Return the user object with all necessary fields
-      res.json({
-        loggedIn: true,
-        user: user, // Include all fields (email, id, name, username, etc.)
-      });
-    } else {
-      res.json({
-        loggedIn: false,
-        user: null,
-      });
-    }
-  } catch (error) {
-    console.error("Error fetching user:", error);
-    res.json({
-      loggedIn: false,
-      user: null,
-    });
-  }
-});
-
 app.get('/api/events/:billId', async (req, res) => {
   const { billId } = req.params;
   try {
