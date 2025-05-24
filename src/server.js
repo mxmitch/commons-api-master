@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const authRoutes = require("./routes/authRoutes");
 const billRoutes = require("./routes/billRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
+const findMpRoutes = require('./routes/findMpRoutes');
 const pool = require('./db');
 
 dotenv.config();
@@ -14,8 +15,8 @@ const port = process.env.PORT || 5000;
 // Enable CORS
 app.use(cors({
   origin: 'http://localhost:3000',
-  methods: 'GET,POST,PUT,DELETE',
-  allowedHeaders: 'Content-Type,Authorization',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
@@ -26,6 +27,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use('/api/findmp', findMpRoutes);
 
 app.get("/", (req, res) => {
   res.send("Welcome to the Commons API!");
@@ -47,6 +49,8 @@ app.get('/api/events/:billId', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+
+
 
 
 app.listen(port, () => {
