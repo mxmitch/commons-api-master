@@ -12,10 +12,10 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Enable CORS
+// ✅ Strict CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://commons-app.netlify.app' // ✅ your deployed frontend
+  'https://commons-app.netlify.app'
 ];
 
 app.use(cors({
@@ -23,30 +23,32 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn(`Blocked CORS request from: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true
 }));
 
-// Middleware
+// ✅ JSON parsing middleware
 app.use(express.json());
 
-// Routes
+// ✅ Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/categories", categoryRoutes);
-app.use('/api/findmp', findMpRoutes);
+app.use("/api/findmp", findMpRoutes);
 
+// ✅ Root check
 app.get("/", (req, res) => {
   res.send("Welcome to the Commons API!");
 });
 
+// ✅ Event fetch route
 app.get('/api/events/:billId', async (req, res) => {
   const { billId } = req.params;
   try {
-    const query = 'SELECT * FROM events WHERE bill_id = $1';
-    const result = await pool.query(query, [billId]);
+    const result = await pool.query('SELECT * FROM events WHERE bill_id = $1', [billId]);
 
     if (result.rows.length === 0) {
       return res.status(404).send('No events found for the given billId');
@@ -59,11 +61,7 @@ app.get('/api/events/:billId', async (req, res) => {
   }
 });
 
-
-
-
+// ✅ Start server
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`✅ Commons API running on port ${port}`);
 });
-
-
