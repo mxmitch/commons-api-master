@@ -2,13 +2,15 @@ const { Pool } = require('pg');
 const dotenv = require('dotenv');
 
 // Initialize dotenv to load environment variables
-dotenv.config();
+require('dotenv').config();
 
 // Create a new pool instance for PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: { rejectUnauthorized: false }
 });
+
+console.log("Using database URL:", process.env.DATABASE_URL);
 
 // Function to execute queries
 const query = async (text, params) => {
