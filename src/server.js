@@ -38,6 +38,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/findmp", findMpRoutes);
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Not Found' });
+});
 
 // ✅ Root check
 app.get("/", (req, res) => {
@@ -60,6 +63,8 @@ app.get('/api/events/:billId', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+
+
 
 // ✅ Start server
 app.listen(port, () => {

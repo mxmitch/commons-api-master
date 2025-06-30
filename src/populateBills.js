@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { pool } = require('./db');
 const { convert } = require('html-to-text');
+const { classifyBills } = require('./services/billService');
 
 
 // Function to insert events for a specific bill
@@ -118,6 +119,14 @@ async function fetchBillsFromLegisInfo() {
 
       await client.query('COMMIT');
       console.log("All bills have been successfully inserted.");
+
+      // ⬇️ Classify uncategorized bills
+      try {
+        const results = await classifyBills();
+        console.log("Classified bills:", results.length);
+      } catch (classifyError) {
+        console.error("Error classifying bills:", classifyError.message || classifyError);
+      }
     } catch (insertError) {
       await client.query('ROLLBACK');
       console.error("Transaction rolled back due to error:", insertError);
@@ -129,5 +138,5 @@ async function fetchBillsFromLegisInfo() {
   }
 }
 
-fetchBillsFromLegisInfo();
+fetchBillsFromLegisInfo().finally(() => process.exit());
 
