@@ -49,7 +49,7 @@ const authLimiter = rateLimit({
 app.use('/api/auth', authLimiter, authRoutes);
 
 // 🔐 Protect all other API routes
-app.use('/api/bills', authMiddleware, billRoutes);
+app.use('/api/bills', billRoutes);
 app.use('/api/categories', authMiddleware, categoryRoutes);
 app.use('/api/findmp', authMiddleware, findMpRoutes);
 

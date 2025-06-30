@@ -3,8 +3,9 @@ const router = express.Router();
 const db = require("../db");
 const Bill = require("../models/bill")(db);
 const { classifyBills } = require("../services/billService");
+const authMiddleware = require("../middleware/authMiddleware"); // 🔐 Import JWT middleware
 
-// GET /api/bills — supports pagination + filters + categories
+// 🔓 GET /api/bills — supports filters, pagination, categories
 router.get("/", async (req, res) => {
   try {
     const {
@@ -41,7 +42,6 @@ router.get("/", async (req, res) => {
 
     const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    // Main bill query with pagination
     const billsQuery = `
       SELECT * FROM bills
       ${whereSQL}
@@ -51,15 +51,10 @@ router.get("/", async (req, res) => {
     `;
     const billsResult = await db.query(billsQuery, [...values, parseInt(limit), parseInt(offset)]);
 
-    // Total count of matching bills
-    const countQuery = `
-      SELECT COUNT(*) FROM bills
-      ${whereSQL}
-    `;
+    const countQuery = `SELECT COUNT(*) FROM bills ${whereSQL}`;
     const countResult = await db.query(countQuery, values);
     const total = parseInt(countResult.rows[0].count, 10);
 
-    // Also fetch categories
     const categoriesResult = await db.query("SELECT * FROM categories");
 
     res.json({
@@ -74,14 +69,31 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET /api/bills/categorized — Classify bills with uClassify
-router.get('/categorized', async (req, res) => {
+// 🔓 GET /api/bills/categorized — Classify bills (public)
+router.get("/categorized", async (req, res) => {
   try {
     const results = await classifyBills();
     res.json({ message: "Classification complete", results });
   } catch (err) {
     console.error("Error classifying bills:", err);
     res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// 🔒 POST /api/bills/:id/watch — Add to user's watchlist
+router.post("/:id/watch", authMiddleware, async (req, res) => {
+  const userId = req.auth.userId;
+  const billId = req.params.id;
+
+  try {
+    await db.query(
+      'INSERT INTO watchlist (user_id, bill_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [userId, billId]
+    );
+    res.status(200).json({ message: "Added to watchlist" });
+  } catch (err) {
+    console.error("Watchlist error:", err);
+    res.status(500).json({ error: "Could not add to watchlist" });
   }
 });
 
