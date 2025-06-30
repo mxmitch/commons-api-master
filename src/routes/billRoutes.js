@@ -45,7 +45,6 @@ router.get("/", async (req, res) => {
     const billsQuery = `
       SELECT * FROM bills
       ${whereSQL}
-      ORDER BY introduced_date DESC
       LIMIT $${values.length + 1}
       OFFSET $${values.length + 2}
     `;
