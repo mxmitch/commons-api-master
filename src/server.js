@@ -64,15 +64,13 @@ app.get("/", (req, res) => {
 });
 
 // 🔐 Example of protected resource: events
-app.get('/api/events/:billId', authMiddleware, async (req, res) => {
+app.get('/api/events/:billId', async (req, res) => {
   const { billId } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM events WHERE bill_id = $1', [billId]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).send('No events found for the given billId');
-    }
-
+    const result = await pool.query(
+      'SELECT * FROM events WHERE LOWER(bill_id) = LOWER($1)',
+      [billId]
+    );
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching events:', error);
