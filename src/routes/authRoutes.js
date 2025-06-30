@@ -2,15 +2,19 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const pool = require('../db'); // Make sure this points to your PostgreSQL connection
 const dotenv = require('dotenv');
+const pool = require('../db');
 const User = require("../models/user");
-dotenv.config(); // Load environment variables
+const authMiddleware = require('../middleware/authMiddleware');
 
-// Secret key for JWT (can be stored in .env)
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
+dotenv.config();
 
-// Login Route
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET is not set in environment variables.");
+}
+
+// ✅ Login Route
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -24,20 +28,26 @@ router.post('/login', async (req, res) => {
 
     const user = rows[0];
 
-    // Compare passwords
-    const validPassword = await bcrypt.compare(password, user.password);
+    // Compare passwords safely
+    let validPassword = false;
+    try {
+      validPassword = await bcrypt.compare(password, user.password);
+    } catch (err) {
+      console.error("Password comparison error:", err);
+    }
+
     if (!validPassword) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
     // Generate JWT Token
     const token = jwt.sign(
-      { userId: user.id, email: user.email },  // Payload (user data)
-      JWT_SECRET, // Secret key to sign the JWT
-      { expiresIn: '1h' } // Expiration time
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '1h' }
     );
 
-    // Return the token and user data (omit password)
+    // Return token + safe user object
     res.json({
       token,
       user: {
@@ -56,15 +66,29 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Register a new user
+// ✅ Register Route
 router.post("/register", async (req, res) => {
-  const { username, email, password, phone_number, postal_code, email_notification, sms_notification } = req.body;
+  const {
+    username,
+    email,
+    password,
+    phone_number,
+    postal_code,
+    email_notification,
+    sms_notification
+  } = req.body;
 
   if (!username || !email || !password) {
     return res.status(400).json({ error: "Username, email, and password are required" });
   }
 
   try {
+    // Prevent duplicate registration
+    const existingUser = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({ error: "Email already in use" });
+    }
+
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -73,45 +97,37 @@ router.post("/register", async (req, res) => {
       [username, email, hashedPassword, phone_number, postal_code, email_notification, sms_notification]
     );
 
-    res.status(201).json(newUser.rows[0]);  // Respond with the new user data
+    const user = newUser.rows[0];
+    delete user.password;
+
+    res.status(201).json(user);
+
   } catch (error) {
     console.error("Register error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// Logout Route - Not necessary for JWT but keeping for consistency
-router.delete('/logout', (req, res) => {
-  // Since JWT is stateless, there’s no need to destroy the session
+// ✅ Protected Logout Route (optional)
+router.delete('/logout', authMiddleware, (req, res) => {
+  // For stateless JWT, no action required
   res.status(200).send({ message: 'Logged out successfully' });
 });
 
-// Check login status route
-router.get("/loginStatus", async (req, res) => {
+// ✅ Protected Login Status Route
+router.get("/loginStatus", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.id; // assuming you're using JWT and the user ID is in the JWT token
+    const userId = req.auth.userId;
 
-    // Fetch the full user data from the database
     const user = await User.findById(userId);
-
     if (user) {
-      // Return the user object with all necessary fields
-      res.json({
-        loggedIn: true,
-        user: user, // Include all fields (email, id, name, username, etc.)
-      });
+      res.json({ loggedIn: true, user });
     } else {
-      res.json({
-        loggedIn: false,
-        user: null,
-      });
+      res.json({ loggedIn: false, user: null });
     }
   } catch (error) {
     console.error("Error fetching user:", error);
-    res.json({
-      loggedIn: false,
-      user: null,
-    });
+    res.status(500).json({ loggedIn: false, user: null });
   }
 });
 
