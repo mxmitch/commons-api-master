@@ -20,9 +20,10 @@ function chunkArray(array, size) {
 async function classifyBills() {
     // Get bills that haven’t been classified yet
     const { rows: billsToClassify } = await db.query(
-       `SELECT id, long_title_en FROM bills 
-     WHERE assigned_categories IS NULL OR jsonb_array_length(assigned_categories) = 0`
+        `SELECT id, long_title_en FROM bills 
+         WHERE assigned_categories IS NULL OR assigned_categories = '{}'`
     );
+
 
     if (billsToClassify.length === 0) {
         console.log("No bills to classify.");
@@ -61,7 +62,7 @@ async function classifyBills() {
 
                 await db.query(
                     'UPDATE bills SET assigned_categories = $1 WHERE id = $2',
-                    [JSON.stringify(topCategories), bill.id] // Use JSON.stringify to store as a JSON array
+                    [topCategories, bill.id] // ✅ pass array directly
                 );
 
                 classifiedBills.push({

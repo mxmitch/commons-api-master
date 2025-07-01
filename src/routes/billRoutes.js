@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require("../db");
 const Bill = require("../models/bill")(db);
 const { classifyBills } = require("../services/billService");
-const authMiddleware = require("../middleware/authMiddleware"); // 🔐 Import JWT middleware
+const authMiddleware = require("../middleware/authMiddleware");
 
 // 🔓 GET /api/bills — supports filters, pagination, categories
 router.get("/", async (req, res) => {
@@ -12,47 +12,59 @@ router.get("/", async (req, res) => {
       status = '',
       session = '',
       senateHouse = '',
-      category = 0,
+      category = "0",
       limit = 50,
       offset = 0
     } = req.query;
-
-    const values = [];
+    
+    // ✅ Use a separate array for filtering values
+    const filterValues = [];
     const whereClauses = [];
 
-    if (status) {
-      values.push(status);
-      whereClauses.push(`status = $${values.length}`);
+    if (status === 'passed') {
+      whereClauses.push(`received_royal_assent_date IS NOT NULL`);
     }
-
-    if (session) {
-      values.push(session);
-      whereClauses.push(`session = $${values.length}`);
+    if (status === 'active') {
+      whereClauses.push(`received_royal_assent_date IS NULL`);
     }
 
     if (senateHouse) {
-      values.push(senateHouse);
-      whereClauses.push(`senate_house = $${values.length}`);
+      filterValues.push(senateHouse);
+      whereClauses.push(`senate_house = $${filterValues.length}`);
     }
 
     if (category && category !== "0") {
-      values.push(parseInt(category));
-      whereClauses.push(`$${values.length} = ANY(assigned_categories)`);
+      filterValues.push(category);
+      whereClauses.push(`$${filterValues.length} = ANY(assigned_categories)`);
     }
 
     const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    const billsQuery = `
-      SELECT * FROM bills
-      ${whereSQL}
-      LIMIT $${values.length + 1}
-      OFFSET $${values.length + 2}
-    `;
-    const billsResult = await db.query(billsQuery, [...values, parseInt(limit), parseInt(offset)]);
+    // 🔍 Log filter input
+    console.log("📦 Filters:", { status, session, senateHouse, category });
+    console.log("🔍 WHERE SQL:", whereSQL);
+    console.log("🔧 Filter values:", filterValues);
 
+    // ✅ Main query with pagination
+    const billsQuery = `
+  SELECT * FROM bills
+  ${whereSQL}
+  ORDER BY
+    LEFT(bill_number, 1),
+    CAST(SUBSTRING(bill_number FROM '\\d+') AS INT)
+  LIMIT $${filterValues.length + 1}
+  OFFSET $${filterValues.length + 2}
+`;
+    const billsResult = await db.query(
+      billsQuery,
+      [...filterValues, parseInt(limit), parseInt(offset)]
+    );
+
+    // ✅ Accurate count query
     const countQuery = `SELECT COUNT(*) FROM bills ${whereSQL}`;
-    const countResult = await db.query(countQuery, values);
-    const total = parseInt(countResult.rows[0].count, 10);
+    const countResult = await db.query(countQuery, filterValues);
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
 
     const categoriesResult = await db.query("SELECT * FROM categories");
 
@@ -63,7 +75,7 @@ router.get("/", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error fetching bills with filters:", error);
+    console.error("❌ Error fetching bills with filters:", error);
     res.status(500).send("Error fetching filtered bills");
   }
 });

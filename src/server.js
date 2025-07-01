@@ -63,17 +63,25 @@ app.get("/", (req, res) => {
   res.send("Welcome to the Commons API!");
 });
 
-// 🔐 Example of protected resource: events
 app.get('/api/events/:billId', async (req, res) => {
   const { billId } = req.params;
+  const normalizedBillId = billId.trim().toLowerCase();
+
+  console.log(`🔎 Looking up events for: "${normalizedBillId}"`);
+
   try {
     const result = await pool.query(
-      'SELECT * FROM events WHERE LOWER(bill_id) = LOWER($1)',
-      [billId]
+      'SELECT * FROM events WHERE LOWER(bill_id) = $1',
+      [normalizedBillId]
     );
-    res.json(result.rows);
+
+    if (result.rows.length === 0) {
+      console.log(`ℹ️ No events found for billId: ${billId}`);
+    }
+
+    res.json(result.rows); // ✅ always return a JSON array
   } catch (error) {
-    console.error('Error fetching events:', error);
+    console.error('❌ Error fetching events:', error);
     res.status(500).send('Server error');
   }
 });
