@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 
 const authRoutes = require("./routes/authRoutes");
 const billRoutes = require("./routes/billRoutes");
@@ -18,6 +19,7 @@ const port = process.env.PORT || 5000;
 
 // ✅ Secure HTTP headers
 app.use(helmet());
+app.use(cookieParser());
 
 // ✅ Strict CORS
 const allowedOrigins = [
@@ -51,7 +53,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 // 🔐 Protect all other API routes
 app.use('/api/bills', billRoutes);
 app.use('/api/categories', authMiddleware, categoryRoutes);
-app.use('/api/findmp', authMiddleware, findMpRoutes);
+app.use('/api/findmp', findMpRoutes);
 
 // ✅ Fallback for unknown API routes
 app.use('/api', (req, res) => {
