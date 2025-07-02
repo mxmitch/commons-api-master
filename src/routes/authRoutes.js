@@ -90,6 +90,7 @@ router.delete('/logout', (req, res) => {
 // ✅ Authenticated Check Route (optional but useful)
 router.get("/check-auth", (req, res) => {
   const token = req.cookies.token;
+  console.log("🔍 Cookie token:", req.cookies.token);
 
   if (!token) {
     return res.status(401).json({ loggedIn: false, user: null });
