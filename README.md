@@ -1,70 +1,148 @@
-# Getting Started with Create React App
+# 🛠️ Commons API Master
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+**Commons API Master** is an Express.js + PostgreSQL backend that powers the [Commons Master](https://github.com/mxmitch/commons-master) React frontend. It provides secure, filtered access to Canadian federal legislative data, including bill status, sessions, and machine-learned categories via uClassify.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 🔗 Live App
 
-### `npm start`
+Frontend: [https://commons-app.netlify.app](https://commons-app.netlify.app)  
+Backend: _(deployed via Render, Railway, or local environment)_
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 📦 Features
 
-### `npm test`
+- 📜 Fetch Canadian federal bills from LegisInfo
+- 🧠 Assign categories using uClassify API
+- 🧮 Filter by status (active/passed), session, house, category
+- 🔒 Secure login/registration via JWT
+- 💾 PostgreSQL-backed storage
+- 🌐 RESTful API used by the Commons Master frontend
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+## 🧭 API Endpoints
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 🧪 Bills
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```http
+GET /api/bills
+```
+Query parameters:
+- `status=active|passed`
+- `session=43-1`
+- `senateHouse=senate|commons`
+- `category=<uClassify category>`
+- `limit`, `offset`
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```http
+GET /api/bills/:id
+```
+Returns a single bill by its unique ID.
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 🗂️ Categories
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```http
+GET /api/categories
+```
+Returns a list of all available categories.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+---
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### 🔐 Auth
 
-## Learn More
+```http
+POST /api/auth/register
+POST /api/auth/login
+```
+Returns JWT on success.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Protected routes require:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+Authorization: Bearer <token>
+```
 
-### Code Splitting
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## 🛠️ Tech Stack
 
-### Analyzing the Bundle Size
+- **Node.js + Express**
+- **PostgreSQL** via `pg`
+- **Sequelize** ORM
+- **JWT-based auth**
+- **CORS + Helmet + Rate Limiters**
+- **uClassify API** for category classification
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+---
 
-### Making a Progressive Web App
+## 🚀 Getting Started
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### 1. Clone the Repo
 
-### Advanced Configuration
+```bash
+git clone https://github.com/mxmitch/commons-api-master.git
+cd commons-api-master
+npm install
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### 2. Configure Environment
 
-### Deployment
+Create a `.env` file in the root with:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+```env
+PORT=5000
+DATABASE_URL=postgres://<username>:<password>@<host>:<port>/<db>
+JWT_SECRET=your_secret_key
+UCLASSIFY_API_KEY=your_uclassify_api_key
+```
 
-### `npm run build` fails to minify
+### 3. Run Locally
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```bash
+npm run dev
+```
+
+---
+
+## 🧪 Testing
+
+_Tests coming soon._
+
+---
+
+## 🌍 Deployment Notes
+
+- Works well on **Render**, **Railway**, or **Heroku**
+- Ensure the database is seeded before launch
+- Add environment variables in the deploy settings
+
+---
+
+## 📁 Project Structure
+
+```
+.
+├── routes/           # billRoutes, authRoutes, categoryRoutes
+├── models/           # Sequelize models (Bill, User)
+├── middleware/       # Auth, rate limiting, etc.
+├── services/         # uClassify integration
+└── index.js          # Entry point
+```
+
+---
+
+## 📝 License
+
+MIT — see [LICENSE](./LICENSE)
+
+---
+
+## 🙌 Credits
+
+Built by [@mxmitch](https://github.com/mxmitch) as part of the Commons Master project  
+Original legislative source: [parl.ca/legisinfo](https://www.parl.ca/legisinfo)  
+Classification powered by [uClassify](https://uclassify.com)
