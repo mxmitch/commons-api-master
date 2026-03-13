@@ -16,14 +16,11 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
-app.set('trust proxy', 1); // Trust first proxy (Render, Vercel, Heroku, etc.)
+app.set('trust proxy', 1);
 
-
-// ✅ Secure HTTP headers
 app.use(helmet());
 app.use(cookieParser());
 
-// ✅ Strict CORS
 const allowedOrigins = [
   'http://localhost:3000',
   'https://commons-app.netlify.app'
@@ -41,28 +38,34 @@ app.use(cors({
   credentials: true
 }));
 
-// ✅ JSON parser
 app.use(express.json());
 
-// ✅ Rate limit login/signup to prevent brute force
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
+// Separate limiters for login vs register
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
   max: 10,
-  message: 'Too many requests from this IP. Try again later.'
+  message: 'Too many login attempts. Try again later.'
 });
-app.use('/api/auth', authLimiter, authRoutes);
 
-// 🔐 Protect all other API routes
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour window for registration
+  max: 5,
+  message: 'Too many registration attempts. Try again later.'
+});
+
+// Apply per-route limiters instead of a blanket one on /api/auth
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth', authRoutes);
+
 app.use('/api/bills', billRoutes);
 app.use('/api/categories', authMiddleware, categoryRoutes);
 app.use('/api/findmp', findMpRoutes);
 
-// ✅ Fallback for unknown API routes
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not Found' });
 });
 
-// ✅ Public root
 app.get("/", (req, res) => {
   res.send("Welcome to the Commons API!");
 });
@@ -71,26 +74,18 @@ app.get('/api/events/:billId', async (req, res) => {
   const { billId } = req.params;
   const normalizedBillId = billId.trim().toLowerCase();
 
-  console.log(`🔎 Looking up events for: "${normalizedBillId}"`);
-
   try {
     const result = await pool.query(
       'SELECT * FROM events WHERE LOWER(bill_id) = $1',
       [normalizedBillId]
     );
-
-    if (result.rows.length === 0) {
-      console.log(`ℹ️ No events found for billId: ${billId}`);
-    }
-
-    res.json(result.rows); // ✅ always return a JSON array
+    res.json(result.rows);
   } catch (error) {
-    console.error('❌ Error fetching events:', error);
+    console.error('Error fetching events:', error);
     res.status(500).send('Server error');
   }
 });
 
-// ✅ Start server
 app.listen(port, () => {
-  console.log(`✅ Commons API running on port ${port}`);
+  console.log(`Commons API running on port ${port}`);
 });
