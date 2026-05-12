@@ -1,25 +1,59 @@
 const { Pool } = require('pg');
-const path = require('path');
-const dotenv = require('dotenv');
+require('dotenv').config();
 
-// Load .env from project root
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+if (!process.env.DATABASE_URL) {
+  throw new Error('❌ DATABASE_URL is missing');
+}
+
+console.log('🧠 DB connecting to:', process.env.DATABASE_URL.split('@')[1]);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+
+  // 🔥 Render Postgres requires SSL
+  ssl: {
+    rejectUnauthorized: false,
+  },
+
+  // 🔥 IMPORTANT: keep pool tiny for Render stability
+  max: 1,
+  min: 0,
+
+  // 🔥 prevents stale / half-dead connections
+  idleTimeoutMillis: 5000,
+  connectionTimeoutMillis: 30000,
+
+  // 🔥 avoids keep-alive weirdness on Render
+  keepAlive: false,
 });
 
-console.log("Using database URL:", process.env.DATABASE_URL);
+// 🔥 hard fail visibility
+pool.on('error', (err) => {
+  console.error('🔥 Unexpected PG pool error:', err.message);
+});
 
-const query = async (text, params) => {
+async function query(text, params) {
+  const client = await pool.connect();
+
   try {
-    const res = await pool.query(text, params);
-    return res;
+    return await client.query(text, params);
   } catch (err) {
-    console.error('Error executing query', err.stack);
+    console.error('❌ DB query error:', err.message);
     throw err;
+  } finally {
+    // forcefully release bad sockets (important for Render instability)
+    client.release(true);
   }
-};
+}
 
-module.exports = { pool, query };
+// graceful shutdown (prevents zombie connections)
+async function closePool() {
+  await pool.end();
+  console.log('🛑 DB pool closed');
+}
+
+module.exports = {
+  query,
+  pool,
+  closePool,
+};

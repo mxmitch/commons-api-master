@@ -2,75 +2,75 @@ const axios = require('axios');
 const db = require('../db');
 
 const API_KEY = 'qDzIkPOBIZJj';
-const MODEL_NAME = 'commons_api';
-const BATCH_SIZE = 5;
+const MODEL = 'commons_api';
 
-function chunkArray(array, size) {
-  const chunks = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
   }
-  return chunks;
+  return out;
 }
 
 async function classifyBills() {
-  const { rows: billsToClassify } = await db.query(
-    `SELECT bill_number, long_title_en FROM bills
-     WHERE assigned_categories IS NULL OR assigned_categories = '{}'`
-  );
+  const { rows: bills } = await db.query(`
+    SELECT bill_number, long_title_en
+    FROM bills
+    WHERE assigned_categories IS NULL OR cardinality(assigned_categories) = 0
+  `);
 
-  if (billsToClassify.length === 0) {
+  if (!bills.length) {
     console.log('No bills to classify.');
     return;
   }
 
-  console.log(`Classifying ${billsToClassify.length} bills in batches of ${BATCH_SIZE}...`);
+  console.log(`🧠 Classifying ${bills.length} bills...`);
 
-  const billChunks = chunkArray(billsToClassify, BATCH_SIZE);
-  const classifiedBills = [];
+  const batches = chunk(bills, 5);
 
-  for (const chunk of billChunks) {
-    const texts = chunk.map(bill => bill.long_title_en.trim());
+  for (const batch of batches) {
+    const texts = batch.map(b => b.long_title_en);
 
     try {
-      const response = await axios.post(
-        `https://api.uclassify.com/v1/frederick/${MODEL_NAME}/classify`,
+      const res = await axios.post(
+        `https://api.uclassify.com/v1/frederick/${MODEL}/classify`,
         { texts },
         {
           headers: {
             Authorization: `Token ${API_KEY}`,
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
         }
       );
 
-      const results = response.data;
+      const results = res.data;
 
-      for (let i = 0; i < chunk.length; i++) {
-        const bill = chunk[i];
-        const classifications = results[i]?.classification || [];
+      for (let i = 0; i < batch.length; i++) {
+        const bill = batch[i];
+        const cats = results[i]?.classification || [];
 
-        const topCategories = classifications
-          .filter(cat => cat.p > 0.05)
+        const top = cats
+          .filter(c => c.p > 0.05)
           .sort((a, b) => b.p - a.p)
-          .map(cat => cat.className);
+          .map(c => c.className);
 
         await db.query(
-          'UPDATE bills SET assigned_categories = $1 WHERE bill_number = $2',
-          [topCategories, bill.bill_number]
+          `UPDATE bills
+           SET assigned_categories = $1
+           WHERE bill_number = $2`,
+          [top, bill.bill_number]
         );
-
-        classifiedBills.push({ bill_number: bill.bill_number, categories: topCategories });
       }
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 🧯 avoid uClassify + DB pressure
+      await new Promise(r => setTimeout(r, 500));
     } catch (err) {
-      console.error('Error during batch classification:', err.response?.data || err.message);
+      console.error('❌ Batch classification failed:', err.message);
     }
   }
 
-  console.log('Classified bills:', classifiedBills);
-  return classifiedBills;
+  console.log('🎉 Classification complete');
 }
 
 module.exports = { classifyBills };
