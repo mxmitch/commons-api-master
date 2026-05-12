@@ -1,5 +1,3 @@
-// src/populateBills.js
-
 const axios = require('axios');
 const db = require('./db');
 const { classifyBills } = require('./services/billService');
@@ -9,8 +7,15 @@ const BILLS_JSON_URL = 'https://www.parl.ca/legisinfo/en/bills/json';
 async function fetchBills() {
   try {
     const res = await axios.get(BILLS_JSON_URL);
-    const bills = res.data || [];
+
+    // Debug API structure
+    console.log('API response keys:', Object.keys(res.data));
+
+    // Bills are nested under Bills
+    const bills = res.data.Bills || [];
+
     console.log(`Fetched ${bills.length} bills.`);
+
     return bills;
   } catch (err) {
     console.error('Error fetching bills JSON:', err.message);
@@ -23,13 +28,14 @@ function parseDate(dateStr) {
 }
 
 async function insertBill(bill) {
-  // BillNumberFormatted is always populated (e.g. "S-1", "C-47")
-  // BillNumber is 0 for pro forma/senate bills and cannot be used as a unique key
+  // Use formatted bill number like "C-1", "S-5"
   const billNumber = bill.BillNumberFormatted;
 
   if (!billNumber) {
-    console.warn(`Skipping BillId ${bill.BillId} — no BillNumberFormatted`);
-    return;
+    console.warn(
+      `Skipping BillId ${bill.BillId} — no BillNumberFormatted`
+    );
+    return false;
   }
 
   try {
@@ -55,33 +61,59 @@ async function insertBill(bill) {
         short_summary_en,
         short_summary_fr
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+        $11,$12,$13,$14,$15,$16,$17,$18,$19
       )
       ON CONFLICT (bill_number) DO NOTHING`,
       [
-        billNumber,                                          // $1  BillNumberFormatted e.g. "S-1"
-        bill.LongTitleEn  || bill.ShortTitleEn || '',       // $2
-        bill.LongTitleFr  || bill.ShortTitleFr || '',       // $3
-        parseDate(bill.PassedHouseFirstReadingDateTime),    // $4
-        parseDate(bill.PassedHouseSecondReadingDateTime),   // $5
-        parseDate(bill.PassedHouseThirdReadingDateTime),    // $6
-        parseDate(bill.PassedSenateFirstReadingDateTime),   // $7
-        parseDate(bill.PassedSenateSecondReadingDateTime),  // $8
-        parseDate(bill.PassedSenateThirdReadingDateTime),   // $9
-        parseDate(bill.ReceivedRoyalAssentDateTime),        // $10
-        bill.ParlSessionCode,                               // $11 e.g. "45-1"
-        bill.ParlSessionEn,                                 // $12
-        bill.ParlSessionFr,                                 // $13
-        bill.SponsorEn,                                     // $14
-        bill.SponsorFr,                                     // $15
-        bill.LatestActivityEn,                              // $16  was latestEventEn — field renamed in API
-        bill.LatestActivityFr,                              // $17  was latestEventFr — field renamed in API
-        null,                                               // $18  short_summary_en — not in API, populated by uClassify
-        null                                                // $19  short_summary_fr — not in API, populated by uClassify
+        billNumber,
+
+        // Titles
+        bill.LongTitleEn || bill.ShortTitleEn || '',
+        bill.LongTitleFr || bill.ShortTitleFr || '',
+
+        // House dates
+        parseDate(bill.PassedHouseFirstReadingDateTime),
+        parseDate(bill.PassedHouseSecondReadingDateTime),
+        parseDate(bill.PassedHouseThirdReadingDateTime),
+
+        // Senate dates
+        parseDate(bill.PassedSenateFirstReadingDateTime),
+        parseDate(bill.PassedSenateSecondReadingDateTime),
+        parseDate(bill.PassedSenateThirdReadingDateTime),
+
+        // Royal assent
+        parseDate(bill.ReceivedRoyalAssentDateTime),
+
+        // Session
+        bill.ParlSessionCode || null,
+        bill.ParlSessionEn || null,
+        bill.ParlSessionFr || null,
+
+        // Sponsors
+        bill.SponsorEn || null,
+        bill.SponsorFr || null,
+
+        // Latest events
+        bill.LatestActivityEn || null,
+        bill.LatestActivityFr || null,
+
+        // Summaries (currently unavailable from API)
+        null,
+        null
       ]
     );
+
+    console.log(`Inserted bill ${billNumber}`);
+
+    return true;
   } catch (err) {
-    console.error(`Error inserting bill ${billNumber}:`, err.message);
+    console.error(
+      `Error inserting bill ${billNumber || bill.BillId}:`,
+      err.message
+    );
+
+    return false;
   }
 }
 
@@ -89,23 +121,39 @@ async function populateAndClassify() {
   console.log('Fetching bills list from LegisInfo JSON...');
 
   const bills = await fetchBills();
-  if (!bills.length) return;
+
+  if (!bills.length) {
+    console.log('No bills returned from API.');
+    return;
+  }
 
   let inserted = 0;
   let skipped = 0;
 
   for (const bill of bills) {
-    if (!bill.BillNumberFormatted) {
+    const success = await insertBill(bill);
+
+    if (success) {
+      inserted++;
+    } else {
       skipped++;
-      continue;
     }
-    await insertBill(bill);
-    inserted++;
   }
 
-  console.log(`Inserted ${inserted} bills, skipped ${skipped}.`);
+  console.log(`Inserted ${inserted} bills.`);
+  console.log(`Skipped ${skipped} bills.`);
+
   console.log('Running classification...');
-  await classifyBills();
+
+  try {
+    await classifyBills();
+    console.log('Classification complete.');
+  } catch (err) {
+    console.error(
+      'Error during classification:',
+      err.response?.data || err.message
+    );
+  }
 
   console.log('Done.');
 }
